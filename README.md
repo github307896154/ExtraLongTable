@@ -16,7 +16,7 @@ vue </br>
 vue</br>
 vue-cli</br>
 css</br>
-js</br></br>
+js</br>
 es6
 # 一些亮点
 页面只加载默认设置的加载量在滚动条滚动的时候进行动态加载，</br>
