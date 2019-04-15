@@ -15,7 +15,7 @@
           <table id="bottomTable" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;" :style="{height:`${loadedNum*40}px`}">
             <tr v-for="(items,indexs) in showTableList" @click="trSelect(indexs)" :class="selectTr==indexs?'trselect':'trhover'">
               <td class="bottom-td" v-if="columns[0].type=='index'" :style="columns[0].width?`width:${columns[0].width}px`:'width:auto'">
-                {{items.index}}</td>
+                {{indexs+dataTop/tdHeight+1}}</td>
               <td class="bottom-td" v-if="columns[0].type=='select'"></td>
               <td v-for="(item,index) in columnsBottom" class="bottom-td" :style="item.width?`width:${item.width}px`:'width:auto'">
                 {{item.logic==undefined?items[item.key]:item.logic(items)}}
@@ -160,7 +160,8 @@ export default {
           //如果滚动高度到达数据显示顶部高度
           if (this.dataTotal > this.loadedNum) {
             //如果数据总数大于已经渲染的数据
-            if (this.dataTotal - this.loadedNum >= this.loadNum) {
+            let dataTopNum = parseInt(this.dataTop / this.tdHeight); //数据顶部条数
+            if (dataTopNum-this.loadNum>=0) {
               //如果数据总数减去已经渲染的数据大于等于loadNum
               this.dataProcessing(
                 this.loadNum,
@@ -169,8 +170,8 @@ export default {
               );
             } else {
               this.dataProcessing(
-                this.dataTotal - this.loadedNum,
-                this.dataTotal - this.loadedNum,
+                dataTopNum,
+                dataTopNum,
                 "top"
               );
             }
@@ -193,8 +194,7 @@ export default {
     handleScrollBottom() {
       let computeHeight =
         this.dataTop +
-        this.loadedNum * this.tdHeight -
-        (this.tableHeight - this.tdHeight - 3); //数据需要处理的时候的高度
+        this.loadedNum * this.tdHeight; //数据需要处理的时候的高度
       if (
         this.scrollTop > computeHeight &&
         this.scrollTop <= computeHeight + this.tdHeight * this.loadNum
@@ -202,9 +202,8 @@ export default {
         this.showLoad = true;
         //如果滚动高度到达数据显示底部高度
         if (this.dataTotal > this.loadedNum) {
-          //如果数据总数大于已经渲染的数据
-          if (this.dataTotal - this.loadedNum >= this.loadNum) {
-            //如果数据总数减去已经渲染的数据大于等于20
+          let dataTopNum = parseInt(this.dataTop / this.tdHeight); //数据顶部条数
+          if (dataTopNum + this.loadedNum+this.loadNum <= this.dataTotal) {//如果数据总数减去已经渲染的数据底部条数大于等于20 
             this.dataProcessing(
               this.loadedNum - this.loadNum,
               this.loadNum,
@@ -212,8 +211,8 @@ export default {
             );
           } else {
             this.dataProcessing(
-              this.dataTotal - this.loadedNum,
-              this.dataTotal - this.loadedNum,
+              this.dataTotal-(dataTopNum+ this.loadedNum),
+              this.dataTotal-(dataTopNum+ this.loadedNum),
               "bottom"
             );
           }
@@ -248,7 +247,6 @@ export default {
         for (var i = 1; i <= topNum; i++) {
           //加上顶部数据
           let indexNum = topPosition - i;
-          this.tableList[indexNum].index = indexNum + 1;
           this.showTableList.unshift(this.tableList[indexNum]);
         }
         this.loadedNum = this.loadedNum + topNum - bottomNum; //重新计算实际渲染数据条数
@@ -261,8 +259,7 @@ export default {
         this.showTableList.splice(0, topNum); //减去顶部数据
         for (var i = 0; i < bottomNum; i++) {
           //加上底部数据
-          let indexNum = topPosition + this.loadedNum + i;
-          this.tableList[indexNum].index = indexNum + 1;
+          let indexNum = topPosition + this.loadedNum + i;         
           this.showTableList.push(this.tableList[indexNum]);
         }
         this.loadedNum = this.loadedNum - topNum + bottomNum; //重新计算实际渲染数据条数
@@ -276,8 +273,7 @@ export default {
         let scrollNum = topNum;
         for (var i = 0; i < bottomNum; i++) {
           //加上底部数据
-          let indexNum = scrollNum - this.loadNum + i;
-          this.tableList[indexNum].index = indexNum + 1;
+          let indexNum = scrollNum - this.loadNum + i;    
           this.showTableList.push(this.tableList[indexNum]);
         }
         this.loadedNum = bottomNum; //重新计算实际渲染数据条数
@@ -288,8 +284,7 @@ export default {
         let scrollNum = bottomNum;
         for (var i = 0; i < topNum; i++) {
           //加上底部数据
-          let indexNum = scrollNum - topNum + this.loadNum + i;
-          this.tableList[indexNum].index = indexNum + 1;
+          let indexNum = scrollNum - topNum + this.loadNum + i;       
           this.showTableList.push(this.tableList[indexNum]);
         }
         this.loadedNum = topNum; //重新计算实际渲染数据条数
@@ -306,8 +301,6 @@ export default {
   watch: {
     tableList: {
       handler(newValue, oldValue) {
-        console.log(newValue.length);
-        
         this.loadedNum = 0; //实际渲染的数据数量
         this.dataTotal = 0; //总数据条数
         this.dataTop = 0; //渲染数据顶部的高度
@@ -336,9 +329,7 @@ export default {
       immediate: true
     },
     columns: {
-      handler(newValue, oldValue) {
-        console.log(newValue);
-        
+      handler(newValue, oldValue) {  
         if (newValue.length > 0) {
           if (this.columns[0].type != undefined) {
             this.columnsBottom = this.columns.slice(1, this.columns.length);
