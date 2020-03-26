@@ -47,8 +47,17 @@
 | loadNum | 默认加载行数 | Number,String | 20 |
 | tdHeight | 表格行高 | Number,String | 20 |
 | tableHeight | 表格高度 | Number,String | 400 |
-
-
+//columns扩展
+| 属性 | 说明 | 类型 | 默认值 |
+| ------ | ------ | ------ | ------ |
+type | 列类型，可选值为 | index | - |
+title |	列头显示文字 |	String |	#
+key |	对应列内容的字段名 |	String |	-
+width |	列宽 |	Number |	-
+align |	对齐方式，可选值为 left 左对齐、right 右对齐和 center 居中对齐 |	String |	left
+sortable |	对应列是否可以排序，如果设置为 custom，则代表用户希望远程排序，需要监听 Table 的 on-sort-change 事件 |	Boolean | 'custom'	false
+sortMethod |	自定义排序使用的方法，接收三个参数 a 、 b 和 type，当设置 sortable: true 时有效。type 值为 asc 和 desc |	Function |	-
+//事件
 | 事件 | 说明 |返回值 |
 | ------ | ------ | ------ |
 | on-row-click | 单击某一行时触发 | index、当前行的数据 |
