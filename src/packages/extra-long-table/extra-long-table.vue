@@ -17,7 +17,7 @@
       <div id="bottomDiv" class="table-bottom" @scroll.stop="handleScroll" v-show="showTableList.length>0">
         <div :style="{height:`${dataTop}px`}"></div>
         <table id="bottomTable" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;" :style="{height:`${loadedNum*tdHeight}px`}">
-          <tr v-for="(items,indexs) in showTableList" @click="rowClick(indexs,items)" @dblclick="rowDblclick(indexs,items)" :style="{'line-height':`${tdHeight}px`}" :class="selectIndex==indexs?'trselect':'trhover'">
+          <tr v-for="(items,indexs) in showTableList" @click="rowClick(items,indexs+dataTop/tdHeight+1)" @dblclick="rowDblclick(items,indexs+dataTop/tdHeight+1)" :style="{'line-height':`${tdHeight}px`}" :class="selectIndex==indexs?'trselect':'trhover'">
             <td class="bottom-td" v-if="columns[0].type=='index'" :style="columns[0].width?`width:${columns[0].width}px`:'width:auto'">
               {{indexs+dataTop/tdHeight+1}}</td>
             <td class="bottom-td" v-if="columns[0].type=='select'"></td>
@@ -49,7 +49,7 @@ export default {
       //默认加载行数
       type: [Number, String],
       default() {
-        return 20;
+        return 60;
       }
     },
     tdHeight: {
@@ -84,8 +84,7 @@ export default {
       type: Boolean,
       default: true
     },
-    highlightRow:{
-    }
+    highlightRow: {}
   },
   data() {
     return {
@@ -110,33 +109,30 @@ export default {
         this.loadedNum * this.tdHeight
       );
     },
-    columnsBottom(){
+    columnsBottom() {
       if (this.columns[0].type != undefined) {
         return this.columns.slice(1, this.columns.length);
       } else {
         return this.columns;
-      }        
+      }
     }
   },
   methods: {
     /**
      * @typedef {Object} Options -配置项
      * @property {Boolean} leading -开始是否需要额外触发一次
-     * @property {Boolean} trailing -结束后是否需要额外触发一次
      * @property {this} context -上下文
      **/
-    //使用Proxy实现函数节流
+    //使用Proxy实现函数防抖
     proxy(
       func,
       time,
       options = {
         leading: true,
-        trailing: true,
         context: null
       }
     ) {
       let timer;
-      let previous = new Date(0).getTime(); //0
       let _this = this;
       let handler = {
         apply(target, _, args) {
@@ -149,20 +145,18 @@ export default {
             return;
           }
           // 和闭包实现核心逻辑相同
-          let now = new Date().getTime();
           if (!options.leading) {
             if (timer) return;
             timer = setTimeout(() => {
               timer = null;
               Reflect.apply(func, options.context, args);
             }, time);
-          } else if (now - previous > time) {
-            Reflect.apply(func, options.context, args);
-            previous = now;
-          } else if (options.trailing) {
-            clearTimeout(timer);
+          } else {
+            if (timer) {
+              _this.needLoad(bottomScroll);
+              clearTimeout(timer);
+            }
             timer = setTimeout(() => {
-              args[0].last = true;
               Reflect.apply(func, options.context, args);
             }, time);
           }
@@ -170,71 +164,93 @@ export default {
       };
       return new Proxy(func, handler);
     },
-    //是否需要加载
-    //优化了拖动过程中多次加载导致闪烁的问题
-    needLoad(last,bottomScroll){
-      if (!last) {
-        if (
-          Math.abs(bottomScroll.scrollTop - this.scrollTop) >
-          this.tdHeight * this.loadNum
-        ) {
-          this.showLoad=true;//显示加载中
-          this.scrollTop = bottomScroll.scrollTop;
-          return true;
-        }
-      }  
+    //是否显示加载中
+    needLoad(bottomScroll) {
+      if (
+        Math.abs(bottomScroll.scrollTop - this.scrollTop) >
+        this.tdHeight * this.loadNum
+      ) {
+        this.showLoad = true; //显示加载中
+        this.scrollTop = bottomScroll.scrollTop;
+      }
     },
     //滚动处理
     scrollProcessing($event) {
       const last = $event && $event.last;
       const bottomScroll = document.getElementById("bottomDiv");
       const topScroll = document.getElementById("topDiv");
-      const direction = bottomScroll.scrollTop >= this.scrollTop;//滚动方向
-      if(this.needLoad(last,bottomScroll))return;
+      const direction = bottomScroll.scrollTop >= this.scrollTop; //滚动方向
+      // if(this.needLoad(last,bottomScroll))return;
       //记录上一次向下滚动的位置
       this.scrollTop = bottomScroll.scrollTop;
-      direction?this.handleScrollBottom():this.handleScrollTop()
-      this.showLoad=false;
+      direction ? this.handleScrollBottom() : this.handleScrollTop();
+      this.showLoad = false;
     },
     //滚动条向上滚动
     handleScrollTop() {
-      if(this.dataTop<this.scrollTop){//如果最后滚动位置在数据上方应该调用向下滚动
+      if (this.dataTop < this.scrollTop) {
+        //如果最后滚动位置在数据上方应该调用向下滚动
         this.handleScrollBottom();
         return;
       }
       //如果加载的数据小于默认加载的数据量
       if (this.dataTotal > this.loadNum) {
-        const computeHeight = this.dataTop; //数据需要处理的时候的高度   
-        const maxHeigth=computeHeight - this.loadNum * this.tdHeight;//不需要清除所有数据的高度
-        if (this.scrollTop < computeHeight &&this.scrollTop >= maxHeigth) {
+        const computeHeight = this.dataTop; //数据需要处理的时候的高度
+        const maxHeigth = computeHeight - this.loadNum * this.tdHeight; //不需要清除所有数据的高度
+        if (this.scrollTop < computeHeight && this.scrollTop >= maxHeigth) {
           //如果数据总数大于已经渲染的数据
           const dataTopNum = parseInt(this.dataTop / this.tdHeight); //数据顶部条数
-          dataTopNum - this.loadNum >= 0?this.dataProcessing(this.loadNum,this.loadedNum - this.loadNum,"top"): this.dataProcessing(dataTopNum, dataTopNum, "top");
-        } else if (this.scrollTop <maxHeigth ) {
+          dataTopNum - this.loadNum >= 0
+            ? this.dataProcessing(
+                this.loadNum,
+                this.loadedNum - this.loadNum,
+                "top"
+              )
+            : this.dataProcessing(dataTopNum, dataTopNum, "top");
+        } else if (this.scrollTop < maxHeigth) {
           const scrollNum = parseInt(this.scrollTop / this.tdHeight); //滚动的位置在第几条数据
-          scrollNum - this.loadNum >= 0?this.dataProcessing(this.loadNum * 2, scrollNum, "topAll"):this.dataProcessing(scrollNum + this.loadNum, scrollNum, "topAll");
+          scrollNum - this.loadNum >= 0
+            ? this.dataProcessing(this.loadNum * 2, scrollNum, "topAll")
+            : this.dataProcessing(
+                scrollNum + this.loadNum,
+                scrollNum,
+                "topAll"
+              );
         }
       }
     },
     //滚动条向下滚动
     handleScrollBottom() {
-      if(this.dataTop>this.scrollTop){
+      if (this.dataTop > this.scrollTop) {
         this.handleScrollTop();
         return;
       }
-      const computeHeight =this.dataTop + this.loadedNum * this.tdHeight - this.tableHeight; //数据需要处理的时候的高度
-      const maxHeight=computeHeight + this.tdHeight * this.loadNum;//不需要清除所有数据的高度
-      if (this.scrollTop > computeHeight &&this.scrollTop <= maxHeight) {
+      const computeHeight =
+        this.dataTop + this.loadedNum * this.tdHeight - this.tableHeight; //数据需要处理的时候的高度
+      const maxHeight = computeHeight + this.tdHeight * this.loadNum; //不需要清除所有数据的高度
+      if (this.scrollTop > computeHeight && this.scrollTop <= maxHeight) {
         //如果滚动高度到达数据显示底部高度
         if (this.dataTotal > this.loadedNum) {
           const dataTopNum = parseInt(this.dataTop / this.tdHeight); //数据顶部条数
-          const total = dataTopNum + this.loadedNum + this.loadNum ;
+          const total = dataTopNum + this.loadedNum + this.loadNum;
           const otherTotal = this.dataTotal - (dataTopNum + this.loadedNum);
-          total<= this.dataTotal?this.dataProcessing(this.loadedNum - this.loadNum,this.loadNum,"bottom"):this.dataProcessing(otherTotal,otherTotal,"bottom");
+          total <= this.dataTotal
+            ? this.dataProcessing(
+                this.loadedNum - this.loadNum,
+                this.loadNum,
+                "bottom"
+              )
+            : this.dataProcessing(otherTotal, otherTotal, "bottom");
         }
-      } else if (this.scrollTop >maxHeight) {
+      } else if (this.scrollTop > maxHeight) {
         let scrollNum = parseInt(this.scrollTop / this.tdHeight); //滚动的位置在第几条数据
-        scrollNum + this.loadNum <= this.dataTotal?this.dataProcessing(scrollNum, this.loadNum * 2, "bottomAll"):this.dataProcessing(scrollNum,this.dataTotal-scrollNum+this.loadNum,"bottomAll")
+        scrollNum + this.loadNum <= this.dataTotal
+          ? this.dataProcessing(scrollNum, this.loadNum * 2, "bottomAll")
+          : this.dataProcessing(
+              scrollNum,
+              this.dataTotal - scrollNum + this.loadNum,
+              "bottomAll"
+            );
       }
     },
     //滚动条左右滚动
@@ -294,16 +310,16 @@ export default {
         this.dataTop = (scrollNum - topNum + this.loadNum) * this.tdHeight; //重新计算渲染数据的高度
         // this.scrollTop = document.getElementById("bottomDiv").scrollTop;
       }
-      this.showLoad=false;
+      this.showLoad = false;
     },
-    rowClick(index,item) {
-      if(this.highlightRow!==undefined){
+    rowClick(index, item) {
+      if (this.highlightRow !== undefined) {
         this.selectIndex = index;
-      }   
-      this.$emit('on-row-click',index,item);
+      }
+      this.$emit("on-row-click", item,index );
     },
-    rowDblclick(index,item) {
-      this.$emit('on-row-dblclick',index,item);
+    rowDblclick(index, item) {
+      this.$emit("on-row-dblclick", item,index);
     },
     //排序
     handleSort(index, type) {
@@ -322,11 +338,10 @@ export default {
     }
   },
   created() {
-    this.handleScroll = this.proxy(this.scrollProcessing, 300, {
+    this.handleScroll = this.proxy(this.scrollProcessing, 240, {
       leading: true,
-      trailing: true,
       context: this
-    });  
+    });
   },
   watch: {
     tableList: {
@@ -362,9 +377,9 @@ export default {
         }
       }
     },
-    tableHeight(newValue){
-      if(newValue){
-        this.scrollProcessing();//表格高度改变重新计算
+    tableHeight(newValue) {
+      if (newValue) {
+        this.scrollProcessing(); //表格高度改变重新计算
       }
     }
   }
