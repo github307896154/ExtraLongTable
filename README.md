@@ -12,7 +12,7 @@
 # 安装方式 and 引入方式
   ** npm方式安装 **
 ``` javascript
-  // npm i extra-long-table -S
+   // npm i extra-long-table -S
 
   // npm引入方式 如下
   // main.js
@@ -26,15 +26,6 @@
   });
   //demo.vue
   <extra-long-table :loadNum='20' :columns='columns' :tableList='dataTable'></extra-long-table>
-
-  //或者 demo.vue
-  <extra-long-table></extra-long-table>
-  import extraLongTable from 'extra-long-table'
-  export default {
-    components: {
-      extraLongTable
-    }
-  }
 ```
 
 # API
